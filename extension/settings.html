@@ -27,13 +27,16 @@
         <div>
           <span class="section-number">01</span>
           <h2 id="hello-title">Windows Hello</h2>
-          <p>Chrome requests Windows Hello directly. A successful test creates the local credential and completes setup.</p>
+          <p>Enroll once, then test the credential separately. Each verification uses a fresh challenge and validates the returned signature inside the extension.</p>
         </div>
         <div class="hello-status">
           <span id="hello-dot" class="status-dot"></span>
           <span id="hello-label">Checking Chrome support…</span>
         </div>
-        <button id="test-button" class="button" type="button">Test Windows Hello</button>
+        <div class="button-row">
+          <button id="enroll-button" class="button" type="button">Set up Windows Hello</button>
+          <button id="test-button" class="button secondary" type="button">Test Windows Hello</button>
+        </div>
         <p id="hello-message" class="status-line" role="status"></p>
       </section>
 
@@ -75,7 +78,7 @@
 
       <aside class="privacy-note">
         <strong>Local by design.</strong>
-        <span>The extension receives only a verified/not-verified result. Your fingerprint, face data, and Windows PIN never leave Windows Hello.</span>
+        <span>Your biometric data and PIN never leave Windows Hello. Settings and temporarily interrupted tab URLs are stored only in this Chrome profile.</span>
       </aside>
     </main>
     <script src="settings.js" type="module"></script>

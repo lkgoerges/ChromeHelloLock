@@ -190,6 +190,16 @@ select {
   margin-top: 18px;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button-row .button {
+  margin-top: 0;
+}
+
 .privacy-note {
   display: flex;
   gap: 9px;

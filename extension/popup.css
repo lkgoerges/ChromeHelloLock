@@ -97,3 +97,9 @@ h1 {
 .settings-link:hover {
   color: var(--ink);
 }
+
+.settings-link:disabled {
+  color: #70716d;
+  cursor: not-allowed;
+  opacity: 0.65;
+}

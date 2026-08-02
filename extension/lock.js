@@ -1,7 +1,10 @@
-import { verifyWithWindowsHello, windowsHelloError } from "./webauthn.js";
+import {
+  getBrowserCredentialStatus,
+  verifyWithWindowsHello,
+  windowsHelloError,
+} from "./webauthn.js";
 
 const unlockButton = document.querySelector("#unlock-button");
-const settingsButton = document.querySelector("#settings-button");
 const status = document.querySelector("#status");
 
 function setStatus(message, type = "") {
@@ -14,13 +17,13 @@ async function authenticate() {
   setStatus("Waiting for Windows Hello…");
 
   try {
-    await verifyWithWindowsHello();
-    const response = await chrome.runtime.sendMessage({ type: "windows-hello-verified" });
-    if (!response?.ok) {
-      setStatus(response?.message || "Authentication was not completed.", "error");
-      return;
-    }
-    setStatus("Verified. Restoring your tabs…", "success");
+    const response = await verifyWithWindowsHello();
+    setStatus(
+      response.migrationRequired
+        ? "Verified. Your tabs are being restored; reconfigure Windows Hello in Settings afterward."
+        : "Verified. Restoring your tabs…",
+      "success",
+    );
   } catch (error) {
     setStatus(windowsHelloError(error), "error");
   } finally {
@@ -29,10 +32,22 @@ async function authenticate() {
 }
 
 unlockButton.addEventListener("click", authenticate);
-settingsButton.addEventListener("click", () => chrome.runtime.openOptionsPage());
 
-const { locked } = await chrome.runtime.sendMessage({ type: "get-status" });
-if (!locked) {
-  setStatus("This profile is already unlocked.", "success");
-  unlockButton.classList.add("hidden");
+try {
+  const [{ locked }, credential] = await Promise.all([
+    chrome.runtime.sendMessage({ type: "get-status" }),
+    getBrowserCredentialStatus(),
+  ]);
+  if (!locked) {
+    setStatus("This profile is already unlocked.", "success");
+    unlockButton.classList.add("hidden");
+  } else if (!credential.enrolled) {
+    setStatus("No Windows Hello credential is enrolled. Disable the extension to recover this profile, then set it up again while unlocked.", "error");
+    unlockButton.disabled = true;
+  } else if (credential.migrationRequired) {
+    setStatus("Unlock once with your existing credential, then reconfigure Windows Hello in Settings.");
+  }
+} catch (error) {
+  setStatus(error.message, "error");
+  unlockButton.disabled = true;
 }

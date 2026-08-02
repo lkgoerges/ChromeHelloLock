@@ -149,17 +149,11 @@ h1 {
   stroke-width: 1.8;
 }
 
-.text-button {
-  margin-top: 13px;
-  padding: 6px;
-  background: transparent;
-  color: #8d8d89;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.text-button:hover {
-  color: var(--ink);
+.recovery-note {
+  margin: 12px auto 0;
+  color: #777873;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 @media (max-width: 560px) {

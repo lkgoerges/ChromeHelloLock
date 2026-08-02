@@ -16,3 +16,5 @@ jobs:
       - name: Validate extension
         shell: pwsh
         run: .\scripts\validate.ps1
+      - name: Test security-critical code
+        run: npm test

@@ -1,109 +1,132 @@
-const CREDENTIAL_KEY = "browserWebAuthnCredential";
+import { decodeBase64Url, encodeBase64Url } from "./webauthn-verifier.js";
 
 function randomBytes(length = 32) {
   return crypto.getRandomValues(new Uint8Array(length));
-}
-
-function encodeBase64Url(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-function decodeBase64Url(value) {
-  const base64 = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 export function browserWebAuthnAvailable() {
   return Boolean(window.PublicKeyCredential && navigator.credentials);
 }
 
-export async function hasBrowserCredential() {
-  const stored = await chrome.storage.local.get(CREDENTIAL_KEY);
-  return Boolean(stored[CREDENTIAL_KEY]?.id);
+export async function getBrowserCredentialStatus() {
+  const response = await chrome.runtime.sendMessage({ type: "credential-status" });
+  if (!response?.ok) throw new Error(response?.message || "Credential status could not be read.");
+  return response.credential;
 }
 
-export async function verifyWithWindowsHello() {
+function requireWebAuthn() {
   if (!browserWebAuthnAvailable()) {
     throw new Error("This Chrome version does not support Windows Hello from extension pages.");
   }
-
-  const stored = await chrome.storage.local.get(CREDENTIAL_KEY);
-  const credentialState = stored[CREDENTIAL_KEY];
-  return credentialState?.id ? getAssertion(credentialState) : createCredential();
 }
 
-async function createCredential() {
-  const userId = randomBytes();
-  const credential = await navigator.credentials.create({
-    publicKey: {
-      challenge: randomBytes(),
-      rp: {
-        name: "Chrome Hello Lock",
-      },
-      user: {
-        id: userId,
-        name: "local-user",
-        displayName: "Windows user",
-      },
-      pubKeyCredParams: [
-        { type: "public-key", alg: -7 },
-        { type: "public-key", alg: -257 },
-      ],
-      authenticatorSelection: {
-        authenticatorAttachment: "platform",
-        residentKey: "discouraged",
-        userVerification: "required",
-      },
-      attestation: "none",
-      timeout: 60_000,
-    },
-  });
-
-  if (!(credential instanceof PublicKeyCredential)) {
-    throw new Error("Chrome did not return a Windows Hello credential.");
-  }
-
-  await chrome.storage.local.set({
-    [CREDENTIAL_KEY]: {
-      id: encodeBase64Url(new Uint8Array(credential.rawId)),
-    },
-  });
-
-  return { created: true };
-}
-
-async function getAssertion(credentialState) {
-  let credentialId;
+async function cancelCeremony() {
   try {
-    credentialId = decodeBase64Url(credentialState.id);
+    await chrome.runtime.sendMessage({ type: "cancel-webauthn" });
   } catch {
-    await chrome.storage.local.remove(CREDENTIAL_KEY);
-    throw new Error("The saved Windows Hello credential was invalid. Try again to create a new one.");
+    // The ceremony expires automatically if the page closes or the worker restarts.
   }
+}
 
-  const assertion = await navigator.credentials.get({
-    publicKey: {
-      challenge: randomBytes(),
-      allowCredentials: [
-        {
-          type: "public-key",
-          id: credentialId,
-          transports: ["internal"],
+export async function enrollWithWindowsHello() {
+  requireWebAuthn();
+  const begin = await chrome.runtime.sendMessage({ type: "begin-registration" });
+  if (!begin?.ok) throw new Error(begin?.message || "Windows Hello setup could not start.");
+
+  try {
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge: decodeBase64Url(begin.challenge),
+        rp: { name: "Chrome Hello Lock" },
+        user: {
+          id: randomBytes(),
+          name: "local-user",
+          displayName: "Windows user",
         },
-      ],
-      userVerification: "required",
-      timeout: 60_000,
-    },
-  });
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 },
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          residentKey: "discouraged",
+          userVerification: "required",
+        },
+        attestation: "none",
+        timeout: 60_000,
+      },
+    });
 
-  if (!(assertion instanceof PublicKeyCredential)) {
-    throw new Error("Windows Hello did not return a verification result.");
+    if (!(credential instanceof PublicKeyCredential) || !(credential.response instanceof AuthenticatorAttestationResponse)) {
+      throw new Error("Chrome did not return a Windows Hello credential.");
+    }
+
+    const publicKey = credential.response.getPublicKey?.();
+    const algorithm = credential.response.getPublicKeyAlgorithm?.();
+    const authenticatorData = credential.response.getAuthenticatorData?.();
+    if (!publicKey || !authenticatorData || ![-7, -257].includes(algorithm)) {
+      throw new Error("This Chrome version cannot export the Windows Hello public key needed for secure verification.");
+    }
+
+    const finish = await chrome.runtime.sendMessage({
+      type: "finish-registration",
+      result: {
+        id: encodeBase64Url(credential.rawId),
+        publicKey: encodeBase64Url(publicKey),
+        algorithm,
+        transports: credential.response.getTransports?.() || ["internal"],
+        clientDataJSON: encodeBase64Url(credential.response.clientDataJSON),
+        authenticatorData: encodeBase64Url(authenticatorData),
+      },
+    });
+    if (!finish?.ok) throw new Error(finish?.message || "Windows Hello setup could not be verified.");
+    return finish.credential;
+  } catch (error) {
+    await cancelCeremony();
+    throw error;
   }
+}
 
-  return { created: false };
+export async function verifyWithWindowsHello() {
+  requireWebAuthn();
+  const begin = await chrome.runtime.sendMessage({ type: "begin-authentication" });
+  if (!begin?.ok) throw new Error(begin?.message || "Windows Hello verification could not start.");
+
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: decodeBase64Url(begin.challenge),
+        allowCredentials: [
+          {
+            type: "public-key",
+            id: decodeBase64Url(begin.credential.id),
+            transports: begin.credential.transports || ["internal"],
+          },
+        ],
+        userVerification: "required",
+        timeout: 60_000,
+      },
+    });
+
+    if (!(assertion instanceof PublicKeyCredential) || !(assertion.response instanceof AuthenticatorAssertionResponse)) {
+      throw new Error("Windows Hello did not return a verification result.");
+    }
+
+    const finish = await chrome.runtime.sendMessage({
+      type: "finish-authentication",
+      result: {
+        id: encodeBase64Url(assertion.rawId),
+        clientDataJSON: encodeBase64Url(assertion.response.clientDataJSON),
+        authenticatorData: encodeBase64Url(assertion.response.authenticatorData),
+        signature: encodeBase64Url(assertion.response.signature),
+      },
+    });
+    if (!finish?.ok) throw new Error(finish?.message || "Windows Hello verification was rejected.");
+    return finish;
+  } catch (error) {
+    await cancelCeremony();
+    throw error;
+  }
 }
 
 export function windowsHelloError(error) {

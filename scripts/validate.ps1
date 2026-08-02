@@ -17,6 +17,16 @@ if ($manifest.key -eq $null -or $manifest.key.Length -lt 100) {
     throw 'The extension manifest must contain its stable public key.'
 }
 
+$expectedPermissions = @('alarms', 'storage', 'tabs')
+$unexpectedPermissions = @($manifest.permissions | Where-Object { $_ -notin $expectedPermissions })
+if ($unexpectedPermissions.Count -gt 0) {
+    throw "Unexpected extension permissions: $($unexpectedPermissions -join ', ')"
+}
+
+if ($manifest.PSObject.Properties.Name -contains 'host_permissions') {
+    throw 'Chrome Hello Lock must not request host permissions.'
+}
+
 $node = Get-Command node.exe -ErrorAction SilentlyContinue
 if ($node) {
     Get-ChildItem -LiteralPath $extensionDir -Filter '*.js' | ForEach-Object {
