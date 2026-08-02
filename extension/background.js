@@ -1,4 +1,3 @@
-const HOST_NAME = "com.lkgsoft.chrome_hello_lock";
 const LOCK_URL = chrome.runtime.getURL("lock.html");
 const SETTINGS_URL = chrome.runtime.getURL("settings.html");
 const AUTO_LOCK_ALARM = "auto-lock";
@@ -10,8 +9,6 @@ const DEFAULT_SETTINGS = Object.freeze({
 });
 
 let enforcementQueue = Promise.resolve();
-let nativePort = null;
-const nativeRequests = new Map();
 
 function enqueue(task) {
   enforcementQueue = enforcementQueue.then(task, task);
@@ -131,109 +128,24 @@ async function unlockProfile() {
   await scheduleAutoLock();
 }
 
-function disconnectNativePort(port, reason) {
-  if (nativePort === port) nativePort = null;
-
-  for (const [requestId, pending] of nativeRequests) {
-    clearTimeout(pending.timeout);
-    pending.reject(new Error(reason));
-    nativeRequests.delete(requestId);
-  }
+function isTrustedVerificationPage(sender) {
+  return sender.id === chrome.runtime.id
+    && (sender.url === LOCK_URL || sender.url === SETTINGS_URL);
 }
 
-function connectNativeHost() {
-  if (nativePort) return nativePort;
-
-  const port = chrome.runtime.connectNative(HOST_NAME);
-  nativePort = port;
-
-  port.onMessage.addListener((message) => {
-    const requestId = message?.requestId;
-    const pending = requestId ? nativeRequests.get(requestId) : null;
-    if (!pending) return;
-
-    clearTimeout(pending.timeout);
-    nativeRequests.delete(requestId);
-    pending.resolve(message);
-  });
-
-  port.onDisconnect.addListener(() => {
-    const reason = chrome.runtime.lastError?.message || "The Windows Hello companion disconnected.";
-    disconnectNativePort(port, reason);
-  });
-
-  return port;
-}
-
-function sendNativeRequest(action, payload = {}, timeoutMs = 15_000) {
-  const requestId = crypto.randomUUID();
-  const port = connectNativeHost();
-
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      nativeRequests.delete(requestId);
-      reject(new Error("The Windows Hello companion did not respond in time."));
-    }, timeoutMs);
-
-    nativeRequests.set(requestId, { resolve, reject, timeout });
-
-    try {
-      port.postMessage({ requestId, action, ...payload });
-    } catch (error) {
-      clearTimeout(timeout);
-      nativeRequests.delete(requestId);
-      reject(error);
-    }
-  });
-}
-
-async function authenticateWithWindowsHello() {
-  const response = await sendNativeRequest(
-    "authenticate",
-    {},
-    120_000,
-  );
-
-  if (!response?.verified) {
-    return {
-      ok: false,
-      result: response?.result || "Unavailable",
-      message: response?.message || "Windows Hello did not verify your identity.",
-    };
-  }
-
-  await chrome.storage.local.set({ setupComplete: true });
-  await unlockProfile();
-  return { ok: true, verified: true, result: response.result };
-}
-
-async function nativeStatus() {
-  try {
-    return await sendNativeRequest("status");
-  } catch (error) {
-    return {
-      ok: false,
-      available: false,
-      availability: "HostNotInstalled",
-      message: error.message,
-    };
-  }
-}
-
-async function handleMessage(message) {
+async function handleMessage(message, sender) {
   switch (message?.type) {
     case "get-status": {
       const settings = await getSettings();
       return { ok: true, locked: await isLocked(), settings };
     }
-    case "get-native-status":
-      return nativeStatus();
-    case "authenticate":
-      try {
-        return await authenticateWithWindowsHello();
-      } catch (error) {
-        return { ok: false, message: error.message };
+    case "windows-hello-verified":
+      if (!isTrustedVerificationPage(sender)) {
+        return { ok: false, message: "Verification result came from an untrusted page." };
       }
+      await chrome.storage.local.set({ setupComplete: true });
+      if (!message.setupOnly) await unlockProfile();
+      return { ok: true, verified: true };
     case "lock":
       await lockProfile();
       return { ok: true, locked: true };
@@ -259,8 +171,8 @@ async function handleMessage(message) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  handleMessage(message).then(sendResponse, (error) => sendResponse({ ok: false, message: error.message }));
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  handleMessage(message, sender).then(sendResponse, (error) => sendResponse({ ok: false, message: error.message }));
   return true;
 });
 

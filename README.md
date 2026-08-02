@@ -10,7 +10,7 @@ Chrome Hello Lock is a small, local-first lock screen for a personal Chrome work
 - Locks active tabs in every Chrome window behind a dedicated lock screen.
 - Protects tabs opened or activated while the profile is locked.
 - Restores interrupted tabs after successful verification.
-- Authenticates locally through Windows Hello.
+- Authenticates locally through Chrome's built-in WebAuthn support and Windows Hello.
 - Locks automatically when Chrome starts, with an optional re-lock timer.
 - Stores no biometric data, Windows PIN, account, or password.
 
@@ -21,50 +21,23 @@ This is intentionally a personal privacy guard, not a hardened security boundary
 - Windows 11, build 22000 or newer.
 - Google Chrome.
 - Windows Hello configured for the current Windows account.
-- PowerShell 5.1 or newer.
-
-The installer downloads a local .NET 10 SDK into the ignored `.tools` directory if no SDK is installed. The published companion is self-contained, so the SDK is not needed after installation.
 
 ## Install from source
 
-1. Open PowerShell in the repository folder and install the native companion:
+1. Open `chrome://extensions` in the work profile.
+2. Enable **Developer mode**.
+3. Select **Load unpacked** and choose the repository's `extension` folder.
+4. Chrome Hello Lock opens its settings page. Select **Test Windows Hello** to complete setup.
+5. Use the toolbar button whenever you want to lock the profile.
 
-   ```powershell
-   .\scripts\install-host.ps1
-   ```
-
-2. Open `chrome://extensions` in the work profile.
-3. Enable **Developer mode**.
-4. Select **Load unpacked** and choose the repository's `extension` folder.
-5. Chrome Hello Lock opens its settings page. Select **Test Windows Hello** to complete setup.
-6. Use the toolbar button whenever you want to lock the profile.
-
-The extension contains a fixed public key, giving unpacked installations the stable ID `bodeojcofhnjbhebeapdokhabmimcjmm`. The native host accepts messages only from that extension origin.
+The extension contains a fixed public key, giving unpacked installations the stable ID `bodeojcofhnjbhebeapdokhabmimcjmm`. Chrome isolates its WebAuthn credential under that extension origin.
 
 ## Development
-
-Build the companion without installing it:
-
-```powershell
-dotnet build .\native-host\ChromeHelloLock.NativeHost.csproj --configuration Release
-```
 
 Validate the extension JavaScript and manifest:
 
 ```powershell
 .\scripts\validate.ps1
-```
-
-Test that the companion handles multiple messages over one connection:
-
-```powershell
-.\scripts\test-native-host.ps1 -ExecutablePath .\native-host\bin\Release\net10.0-windows10.0.22621.0\win-x64\ChromeHelloLock.NativeHost.exe
-```
-
-Reinstall after native companion changes:
-
-```powershell
-.\scripts\install-host.ps1
 ```
 
 ## Architecture
@@ -73,26 +46,25 @@ Reinstall after native companion changes:
 Chrome extension service worker
   ├─ tracks locked state in chrome.storage.session
   ├─ redirects active/new tabs to lock.html
-  └─ sends a native message when unlock is requested
+  └─ accepts a successful result only from lock.html or settings.html
           │
           ▼
-.NET native messaging host
-  ├─ enrolls a local, Windows Hello-backed WebAuthn credential once
-  └─ requests a WebAuthn assertion for each unlock
+Visible Chrome extension page
+  └─ calls navigator.credentials with user verification required
           │
           ▼
-Windows Hello passkey UI → verified / not verified
+Chrome WebAuthn → Windows Hello → verified / not verified
 ```
 
-Chrome keeps one native-messaging connection open for the browser session. The companion processes length-prefixed JSON messages sequentially on a dedicated STA UI thread and keeps a valid owner window and message loop alive. The private credential stays inside Windows Hello; the companion stores only its public identifier under `%LOCALAPPDATA%\ChromeHelloLock`. The extension only receives the verification result.
+The private credential stays inside Windows Hello. The extension stores only its public identifier in `chrome.storage.local`; no server or companion process participates in authentication.
 
-## Uninstall the companion
+## Remove an older companion installation
+
+Versions before 0.3.0 used a native companion. It is no longer called by the extension and can be removed with:
 
 ```powershell
 .\scripts\uninstall-host.ps1
 ```
-
-Then remove the extension from `chrome://extensions`.
 
 ## License
 

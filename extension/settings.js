@@ -1,3 +1,10 @@
+import {
+  browserWebAuthnAvailable,
+  hasBrowserCredential,
+  verifyWithWindowsHello,
+  windowsHelloError,
+} from "./webauthn.js";
+
 const nativeDot = document.querySelector("#native-dot");
 const nativeLabel = document.querySelector("#native-label");
 const nativeMessage = document.querySelector("#native-message");
@@ -12,20 +19,24 @@ function setMessage(element, message, type = "") {
   element.className = `status-line ${type}`.trim();
 }
 
-async function checkNativeHost() {
-  const response = await chrome.runtime.sendMessage({ type: "get-native-status" });
-  nativeDot.className = `status-dot ${response?.available ? "available" : "error"}`;
-  nativeLabel.textContent = response?.available
-    ? response.availability === "NeedsEnrollment"
-      ? "Ready — Windows Hello setup required"
-      : "Ready — Windows Hello credential found"
-    : response?.availability === "HostNotInstalled"
-      ? "Companion not installed"
-      : `Unavailable — ${response?.availability || "unknown"}`;
-
-  if (response?.message) {
-    setMessage(nativeMessage, response.message, response.available ? "" : "error");
-  }
+async function checkWindowsHello() {
+  const available = browserWebAuthnAvailable();
+  const enrolled = available && (await hasBrowserCredential());
+  nativeDot.className = `status-dot ${available ? "available" : "error"}`;
+  nativeLabel.textContent = available
+    ? enrolled
+      ? "Ready — Windows Hello credential found"
+      : "Ready — Windows Hello setup required"
+    : "Unavailable in this Chrome version";
+  setMessage(
+    nativeMessage,
+    available
+      ? enrolled
+        ? "Chrome will request verification directly; no companion is used."
+        : "The first test creates a credential owned by this Chrome extension."
+      : "Update Chrome to use browser-owned Windows Hello authentication.",
+    available ? "" : "error",
+  );
 }
 
 testButton.addEventListener("click", async () => {
@@ -33,16 +44,26 @@ testButton.addEventListener("click", async () => {
   setMessage(nativeMessage, "Waiting for Windows Hello…");
 
   try {
-    const response = await chrome.runtime.sendMessage({ type: "authenticate" });
+    const verification = await verifyWithWindowsHello();
+    const response = await chrome.runtime.sendMessage({
+      type: "windows-hello-verified",
+      setupOnly: true,
+    });
     if (!response?.ok) {
       setMessage(nativeMessage, response?.message || "Verification was not completed.", "error");
       return;
     }
     nativeDot.className = "status-dot available";
     nativeLabel.textContent = "Ready — Windows Hello credential found";
-    setMessage(nativeMessage, "Windows Hello is connected. Setup is complete.", "success");
+    setMessage(
+      nativeMessage,
+      verification.created
+        ? "Chrome created the local Windows Hello credential. Setup is complete."
+        : "Windows Hello verification succeeded.",
+      "success",
+    );
   } catch (error) {
-    setMessage(nativeMessage, error.message, "error");
+    setMessage(nativeMessage, windowsHelloError(error), "error");
   } finally {
     testButton.disabled = false;
   }
@@ -71,7 +92,7 @@ saveButton.addEventListener("click", async () => {
 
 const [{ settings }] = await Promise.all([
   chrome.runtime.sendMessage({ type: "get-settings" }),
-  checkNativeHost(),
+  checkWindowsHello(),
 ]);
 
 lockOnStartup.checked = settings.lockOnStartup;

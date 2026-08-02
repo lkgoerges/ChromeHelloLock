@@ -1,3 +1,5 @@
+import { verifyWithWindowsHello, windowsHelloError } from "./webauthn.js";
+
 const unlockButton = document.querySelector("#unlock-button");
 const settingsButton = document.querySelector("#settings-button");
 const status = document.querySelector("#status");
@@ -12,14 +14,15 @@ async function authenticate() {
   setStatus("Waiting for Windows Hello…");
 
   try {
-    const response = await chrome.runtime.sendMessage({ type: "authenticate" });
+    await verifyWithWindowsHello();
+    const response = await chrome.runtime.sendMessage({ type: "windows-hello-verified" });
     if (!response?.ok) {
       setStatus(response?.message || "Authentication was not completed.", "error");
       return;
     }
     setStatus("Verified. Restoring your tabs…", "success");
   } catch (error) {
-    setStatus(error.message, "error");
+    setStatus(windowsHelloError(error), "error");
   } finally {
     unlockButton.disabled = false;
   }
