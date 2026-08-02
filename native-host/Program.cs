@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Windows.Forms;
-using Windows.Security.Credentials.UI;
 
 namespace ChromeHelloLock.NativeHost;
 
@@ -31,11 +30,10 @@ internal static class Program
 
 internal sealed class NativeHostApplicationContext : ApplicationContext
 {
-    private const string DefaultPrompt = "Unlock your Chrome work profile";
-
     private readonly Stream input;
     private readonly Stream output;
     private readonly Form ownerWindow;
+    private readonly WebAuthnService webAuthn;
     private readonly CancellationTokenSource shutdown = new();
 
     public NativeHostApplicationContext(Stream input, Stream output)
@@ -47,6 +45,7 @@ internal sealed class NativeHostApplicationContext : ApplicationContext
         // Accessing Handle creates the HWND on this STA thread. Application.Run
         // then supplies the message loop required by desktop WinRT UI.
         _ = ownerWindow.Handle;
+        webAuthn = new WebAuthnService(ownerWindow.Handle);
         _ = Task.Run(ReadMessages);
     }
 
@@ -92,11 +91,11 @@ internal sealed class NativeHostApplicationContext : ApplicationContext
 
         try
         {
-            ownerWindow.BeginInvoke((Action)(async () =>
+            ownerWindow.BeginInvoke((Action)(() =>
             {
                 try
                 {
-                    completion.SetResult(await HandleRequestOnUiThread(request));
+                    completion.SetResult(HandleRequestOnUiThread(request));
                 }
                 catch (Exception exception)
                 {
@@ -118,51 +117,28 @@ internal sealed class NativeHostApplicationContext : ApplicationContext
         return completion.Task;
     }
 
-    private async Task<NativeResponse> HandleRequestOnUiThread(NativeRequest request)
+    private NativeResponse HandleRequestOnUiThread(NativeRequest request)
     {
         return request.Action switch
         {
-            "status" => NativeResponse.Ready(request.RequestId),
-            "authenticate" => await AuthenticateOnUiThread(request),
+            "status" => NativeResponse.Ready(request.RequestId, webAuthn.HasCredential),
+            "authenticate" => AuthenticateOnUiThread(request),
             _ => NativeResponse.Error(request.RequestId, "InvalidRequest", "Unknown native host action."),
         };
     }
 
-    private async Task<NativeResponse> AuthenticateOnUiThread(NativeRequest request)
+    private NativeResponse AuthenticateOnUiThread(NativeRequest request)
     {
-        string message = string.IsNullOrWhiteSpace(request.Message) ? DefaultPrompt : request.Message.Trim();
-        if (message.Length > 160) message = message[..160];
-
-        // Deliberately do not call CheckAvailabilityAsync first. Some WBF
-        // drivers mishandle two back-to-back biometric sessions. The request
-        // itself reports unavailable, unconfigured, and busy states.
-        UserConsentVerificationResult result = await UserConsentVerifierInterop
-            .RequestVerificationForWindowAsync(ownerWindow.Handle, message);
-
-        bool verified = result == UserConsentVerificationResult.Verified;
+        WebAuthnResult result = webAuthn.Authenticate();
         return new NativeResponse(
             RequestId: request.RequestId,
-            Ok: verified,
-            Available: result is not UserConsentVerificationResult.DeviceNotPresent
-                and not UserConsentVerificationResult.NotConfiguredForUser
-                and not UserConsentVerificationResult.DisabledByPolicy,
-            Verified: verified,
-            Availability: "HostReady",
-            Result: result.ToString(),
-            Message: VerificationMessage(result));
+            Ok: result.Verified,
+            Available: result.Available,
+            Verified: result.Verified,
+            Availability: webAuthn.HasCredential ? "Ready" : "NeedsEnrollment",
+            Result: result.Code,
+            Message: result.Message);
     }
-
-    private static string VerificationMessage(UserConsentVerificationResult result) => result switch
-    {
-        UserConsentVerificationResult.Verified => "Windows Hello verified the current user.",
-        UserConsentVerificationResult.DeviceBusy => "The Windows Hello device is busy.",
-        UserConsentVerificationResult.DeviceNotPresent => "No Windows Hello authentication device was found.",
-        UserConsentVerificationResult.DisabledByPolicy => "Windows Hello verification is disabled by policy.",
-        UserConsentVerificationResult.NotConfiguredForUser => "Set up Windows Hello for this Windows account first.",
-        UserConsentVerificationResult.RetriesExhausted => "Too many attempts were made. Try again later.",
-        UserConsentVerificationResult.Canceled => "Windows Hello was canceled.",
-        _ => "Windows Hello could not verify the current user.",
-    };
 
     private void RequestExit()
     {
@@ -189,7 +165,7 @@ internal sealed class NativeHostApplicationContext : ApplicationContext
     }
 }
 
-internal sealed record NativeRequest(string? RequestId, string Action, string? Message);
+internal sealed record NativeRequest(string? RequestId, string Action);
 
 internal sealed record NativeResponse(
     string? RequestId,
@@ -200,8 +176,17 @@ internal sealed record NativeResponse(
     string? Result,
     string Message)
 {
-    public static NativeResponse Ready(string? requestId) =>
-        new(requestId, true, true, false, "HostReady", null, "Windows Hello companion is ready.");
+    public static NativeResponse Ready(string? requestId, bool hasCredential) =>
+        new(
+            requestId,
+            true,
+            true,
+            false,
+            hasCredential ? "Ready" : "NeedsEnrollment",
+            null,
+            hasCredential
+                ? "Windows Hello companion is ready."
+                : "Select Test Windows Hello once to create the local Windows Hello credential.");
 
     public static NativeResponse Error(string? requestId, string result, string message) =>
         new(requestId, false, false, false, "Unknown", result, message);

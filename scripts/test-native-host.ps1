@@ -45,13 +45,13 @@ function Send-NativeMessage {
 
 try {
     $first = Send-NativeMessage -RequestId 'status-1'
-    if (-not $first.ok -or $first.requestId -ne 'status-1' -or $first.availability -ne 'HostReady') {
+    if (-not $first.ok -or $first.requestId -ne 'status-1' -or $first.availability -notin @('Ready', 'NeedsEnrollment')) {
         throw 'The first native host response was invalid.'
     }
     if ($process.HasExited) { throw 'The native host exited after the first message.' }
 
     $second = Send-NativeMessage -RequestId 'status-2'
-    if (-not $second.ok -or $second.requestId -ne 'status-2' -or $second.availability -ne 'HostReady') {
+    if (-not $second.ok -or $second.requestId -ne 'status-2' -or $second.availability -notin @('Ready', 'NeedsEnrollment')) {
         throw 'The second native host response was invalid.'
     }
     if ($process.HasExited) { throw 'The native host exited before the port was closed.' }

@@ -190,9 +190,7 @@ function sendNativeRequest(action, payload = {}, timeoutMs = 15_000) {
 async function authenticateWithWindowsHello() {
   const response = await sendNativeRequest(
     "authenticate",
-    {
-      message: "Unlock your Chrome work profile",
-    },
+    {},
     120_000,
   );
 

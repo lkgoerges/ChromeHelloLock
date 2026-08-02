@@ -77,13 +77,14 @@ Chrome extension service worker
           │
           ▼
 .NET native messaging host
-  └─ invokes Windows UserConsentVerifier
+  ├─ enrolls a local, Windows Hello-backed WebAuthn credential once
+  └─ requests a WebAuthn assertion for each unlock
           │
           ▼
-Windows Hello → verified / not verified
+Windows Hello passkey UI → verified / not verified
 ```
 
-Chrome keeps one native-messaging connection open for the browser session. The companion processes length-prefixed JSON messages sequentially on a dedicated STA UI thread and keeps a valid owner window and message loop alive. The extension only receives the verification result.
+Chrome keeps one native-messaging connection open for the browser session. The companion processes length-prefixed JSON messages sequentially on a dedicated STA UI thread and keeps a valid owner window and message loop alive. The private credential stays inside Windows Hello; the companion stores only its public identifier under `%LOCALAPPDATA%\ChromeHelloLock`. The extension only receives the verification result.
 
 ## Uninstall the companion
 

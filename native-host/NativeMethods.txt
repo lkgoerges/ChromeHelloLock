@@ -1,0 +1,6 @@
+WebAuthNGetApiVersionNumber
+WebAuthNAuthenticatorMakeCredential
+WebAuthNFreeCredentialAttestation
+WebAuthNAuthenticatorGetAssertion
+WebAuthNFreeAssertion
+WebAuthNGetErrorName

@@ -16,13 +16,15 @@ async function checkNativeHost() {
   const response = await chrome.runtime.sendMessage({ type: "get-native-status" });
   nativeDot.className = `status-dot ${response?.available ? "available" : "error"}`;
   nativeLabel.textContent = response?.available
-    ? `Ready — ${response.availability}`
+    ? response.availability === "NeedsEnrollment"
+      ? "Ready — Windows Hello setup required"
+      : "Ready — Windows Hello credential found"
     : response?.availability === "HostNotInstalled"
       ? "Companion not installed"
       : `Unavailable — ${response?.availability || "unknown"}`;
 
-  if (!response?.available && response?.message) {
-    setMessage(nativeMessage, response.message, "error");
+  if (response?.message) {
+    setMessage(nativeMessage, response.message, response.available ? "" : "error");
   }
 }
 
@@ -37,7 +39,7 @@ testButton.addEventListener("click", async () => {
       return;
     }
     nativeDot.className = "status-dot available";
-    nativeLabel.textContent = "Ready — verification succeeded";
+    nativeLabel.textContent = "Ready — Windows Hello credential found";
     setMessage(nativeMessage, "Windows Hello is connected. Setup is complete.", "success");
   } catch (error) {
     setMessage(nativeMessage, error.message, "error");
