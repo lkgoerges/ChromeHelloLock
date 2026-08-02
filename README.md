@@ -11,6 +11,7 @@ Chrome Hello Lock is a small, local-first lock screen for a personal Chrome work
 - Protects tabs opened or activated while the profile is locked.
 - Restores interrupted tabs after successful verification.
 - Keeps restore targets across Chrome restarts, extension updates, and service-worker restarts.
+- Detects a stale background worker and can reload an unpacked extension directly from the lock screen.
 - Authenticates locally through Chrome's built-in WebAuthn support and Windows Hello.
 - Verifies the one-time challenge, extension origin, user-verification flags, relying-party binding, and assertion signature.
 - Locks automatically when Chrome starts, with an optional re-lock timer.

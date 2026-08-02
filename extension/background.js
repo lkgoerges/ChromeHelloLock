@@ -14,6 +14,7 @@ const CREDENTIAL_KEY = "browserWebAuthnCredential";
 const BINDINGS_KEY = "tabTargetBindings";
 const CEREMONY_KEY = "pendingWebAuthnCeremony";
 const CEREMONY_LIFETIME_MS = 70_000;
+const PROTOCOL_VERSION = 2;
 
 const DEFAULT_SETTINGS = Object.freeze({
   setupComplete: false,
@@ -389,7 +390,13 @@ async function handleMessage(message, sender) {
     case "get-status": {
       requirePage(sender, ["lock", "settings", "popup"]);
       const settings = await getSettings();
-      return { ok: true, locked: await isLocked(), settings, credential: await credentialStatus() };
+      return {
+        ok: true,
+        protocolVersion: PROTOCOL_VERSION,
+        locked: await isLocked(),
+        settings,
+        credential: await credentialStatus(),
+      };
     }
     case "credential-status":
       requirePage(sender, ["lock", "settings", "popup"]);

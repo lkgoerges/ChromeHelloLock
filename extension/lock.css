@@ -140,6 +140,10 @@ h1 {
   width: 100%;
 }
 
+.reload-button {
+  width: 100%;
+}
+
 .unlock-button svg {
   width: 21px;
   fill: none;
