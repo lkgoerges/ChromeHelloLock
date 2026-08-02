@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chrome Hello Lock</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header>
+        <span class="mini-mark" aria-hidden="true"></span>
+        <div>
+          <strong>Chrome Hello Lock</strong>
+          <span id="profile-state">Checking profile…</span>
+        </div>
+      </header>
+
+      <section class="state-card">
+        <div id="state-orb" class="state-orb"></div>
+        <div>
+          <p class="state-label">Current state</p>
+          <h1 id="state-title">Checking…</h1>
+        </div>
+      </section>
+
+      <button id="primary-button" class="button" type="button" disabled>Loading…</button>
+      <button id="settings-button" class="settings-link" type="button">Settings</button>
+      <p id="status" class="status-line" role="status"></p>
+    </main>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

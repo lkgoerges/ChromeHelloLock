@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Hello Lock",
+  "version": "0.1.0",
+  "description": "Lock a Chrome work profile and unlock it with Windows Hello.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx1Ds70GBy9jr0pZT3hVWUTgpSTb4gfatRkMk9TbvJJUWXMno6f7Ml+eGLSarVOdS5kayvDflvS/WZ63q6dpf8Z8KpErBsH+yPr9KvGG4lJ0o4fl5H43UU0f40HNAZW0XwiQfN1xBUAhw6sop1356ZKn6u6arimi9D+mmyyhcTho0v+uAlfh3TvXPxBZuTe+kzgDQxcUnTTmhdk5oyDycMCJScsA9TPP3BUI15u5t2rwHOSBxPG/WZ+e0obzS17flHCNTYaRpzbA+QlfOKktT/jVVbj46OTVec4red+MEyNJ+W9C/zHeVfbHlXpViguAREgFEOk23WdkOXdQ5uHATJQIDAQAB",
+  "permissions": [
+    "alarms",
+    "nativeMessaging",
+    "storage",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Chrome Hello Lock",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "options_page": "settings.html"
+}

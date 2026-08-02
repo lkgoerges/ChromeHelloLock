@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-extension:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate extension
+        shell: pwsh
+        run: .\scripts\validate.ps1
+
+  build-native-host:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build native host
+        run: dotnet build .\native-host\ChromeHelloLock.NativeHost.csproj --configuration Release

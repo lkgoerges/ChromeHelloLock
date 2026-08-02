@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chrome Hello Lock — Settings</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <main class="settings-shell">
+      <header class="page-header">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <path d="M10 14v-3.2a6 6 0 0 1 12 0V14" />
+            <rect x="7" y="14" width="18" height="14" rx="5" />
+            <path d="M16 19v4" />
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">Chrome Hello Lock</p>
+          <h1>Settings</h1>
+        </div>
+      </header>
+
+      <section class="settings-card hello-card" aria-labelledby="hello-title">
+        <div>
+          <span class="section-number">01</span>
+          <h2 id="hello-title">Windows Hello companion</h2>
+          <p>Verify that the local companion can reach Windows Hello. A successful test also completes setup.</p>
+        </div>
+        <div class="hello-status">
+          <span id="native-dot" class="status-dot"></span>
+          <span id="native-label">Checking companion…</span>
+        </div>
+        <button id="test-button" class="button" type="button">Test Windows Hello</button>
+        <p id="native-message" class="status-line" role="status"></p>
+      </section>
+
+      <section class="settings-card" aria-labelledby="behavior-title">
+        <div>
+          <span class="section-number">02</span>
+          <h2 id="behavior-title">Lock behavior</h2>
+          <p>Choose when the work profile should return to its locked state.</p>
+        </div>
+
+        <label class="setting-row" for="lock-on-startup">
+          <span>
+            <strong>Lock when Chrome starts</strong>
+            <small>Recommended for a work profile shared on this PC.</small>
+          </span>
+          <span class="toggle">
+            <input id="lock-on-startup" type="checkbox" />
+            <span aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <label class="select-row" for="auto-lock">
+          <span>
+            <strong>Automatically lock again</strong>
+            <small>Starts counting after a successful unlock.</small>
+          </span>
+          <select id="auto-lock">
+            <option value="0">Only manually</option>
+            <option value="5">After 5 minutes</option>
+            <option value="15">After 15 minutes</option>
+            <option value="30">After 30 minutes</option>
+            <option value="60">After 1 hour</option>
+          </select>
+        </label>
+
+        <button id="save-button" class="button secondary" type="button">Save settings</button>
+        <p id="save-message" class="status-line" role="status"></p>
+      </section>
+
+      <aside class="privacy-note">
+        <strong>Local by design.</strong>
+        <span>The extension receives only a verified/not-verified result. Your fingerprint, face data, and Windows PIN never leave Windows Hello.</span>
+      </aside>
+    </main>
+    <script src="settings.js" type="module"></script>
+  </body>
+</html>

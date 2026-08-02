@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Work profile locked</title>
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="lock.css" />
+  </head>
+  <body>
+    <main class="lock-shell">
+      <div class="aurora aurora-one"></div>
+      <div class="aurora aurora-two"></div>
+
+      <section class="lock-card" aria-labelledby="lock-title">
+        <div class="brand-row">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" role="img">
+              <path d="M10 14v-3.2a6 6 0 0 1 12 0V14" />
+              <rect x="7" y="14" width="18" height="14" rx="5" />
+              <path d="M16 19v4" />
+            </svg>
+          </span>
+          <span>Chrome Hello Lock</span>
+        </div>
+
+        <div class="lock-illustration" aria-hidden="true">
+          <span class="pulse-ring ring-one"></span>
+          <span class="pulse-ring ring-two"></span>
+          <svg viewBox="0 0 96 96" role="img">
+            <path d="M30 43V31a18 18 0 0 1 36 0v12" />
+            <rect x="20" y="42" width="56" height="44" rx="15" />
+            <path d="M48 58v12" />
+          </svg>
+        </div>
+
+        <p class="eyebrow">Work profile</p>
+        <h1 id="lock-title">Locked for now.</h1>
+        <p class="lede">Your tabs are still here. Verify with Windows Hello to return exactly where you left off.</p>
+
+        <button id="unlock-button" class="button unlock-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2a7 7 0 0 0-7 7v2m14 0V9a7 7 0 0 0-3.2-5.9M8 22a4 4 0 0 1-4-4v-3m16 0v3a4 4 0 0 1-4 4M9 13v2m6-2v2m-6 3h6" />
+          </svg>
+          <span>Unlock with Windows Hello</span>
+        </button>
+
+        <p id="status" class="status-line" role="status">Fingerprint, face, or Windows PIN</p>
+        <button id="settings-button" class="text-button" type="button">Settings</button>
+      </section>
+    </main>
+    <script src="lock.js" type="module"></script>
+  </body>
+</html>
