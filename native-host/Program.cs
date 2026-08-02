@@ -6,113 +6,151 @@ namespace ChromeHelloLock.NativeHost;
 
 internal static class Program
 {
-    private const string DefaultPrompt = "Unlock your Chrome work profile";
-
     [STAThread]
-    private static int Main(string[] args)
+    private static int Main()
     {
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+
         try
         {
-            using Stream input = Console.OpenStandardInput();
-            using Stream output = Console.OpenStandardOutput();
-
-            NativeRequest request = NativeMessageProtocol.Read(input);
-            NativeResponse response = HandleRequestAsync(request, args).GetAwaiter().GetResult();
-            NativeMessageProtocol.Write(output, response);
-            return response.Ok ? 0 : 1;
+            var context = new NativeHostApplicationContext(
+                Console.OpenStandardInput(),
+                Console.OpenStandardOutput());
+            Application.Run(context);
+            return 0;
         }
-        catch (Exception exception)
+        catch
         {
-            try
-            {
-                using Stream output = Console.OpenStandardOutput();
-                NativeMessageProtocol.Write(output, NativeResponse.Error("HostError", exception.Message));
-            }
-            catch
-            {
-                // Chrome will report a broken native messaging host if stdout is unavailable.
-            }
-
+            // Chrome reports a disconnected native host. Nothing may be written
+            // except framed protocol messages because stdout is the transport.
             return 1;
         }
     }
+}
 
-    private static async Task<NativeResponse> HandleRequestAsync(NativeRequest request, string[] args)
+internal sealed class NativeHostApplicationContext : ApplicationContext
+{
+    private const string DefaultPrompt = "Unlock your Chrome work profile";
+
+    private readonly Stream input;
+    private readonly Stream output;
+    private readonly Form ownerWindow;
+    private readonly CancellationTokenSource shutdown = new();
+
+    public NativeHostApplicationContext(Stream input, Stream output)
+    {
+        this.input = input;
+        this.output = output;
+        ownerWindow = CreateOwnerWindow();
+
+        // Accessing Handle creates the HWND on this STA thread. Application.Run
+        // then supplies the message loop required by desktop WinRT UI.
+        _ = ownerWindow.Handle;
+        _ = Task.Run(ReadMessages);
+    }
+
+    private static Form CreateOwnerWindow() => new()
+    {
+        Text = "Chrome Hello Lock",
+        FormBorderStyle = FormBorderStyle.FixedToolWindow,
+        ShowInTaskbar = false,
+        StartPosition = FormStartPosition.Manual,
+        Location = new System.Drawing.Point(-32_000, -32_000),
+        Size = new System.Drawing.Size(1, 1),
+        Opacity = 0,
+    };
+
+    private void ReadMessages()
+    {
+        try
+        {
+            while (!shutdown.IsCancellationRequested)
+            {
+                NativeRequest? request = NativeMessageProtocol.Read(input);
+                if (request is null) break;
+
+                NativeResponse response = DispatchToUiThread(request).GetAwaiter().GetResult();
+                NativeMessageProtocol.Write(output, response);
+            }
+        }
+        catch
+        {
+            // If a valid request was not available, Chrome will surface the port
+            // disconnection. Do not emit unframed diagnostics to stdout.
+        }
+        finally
+        {
+            RequestExit();
+        }
+    }
+
+    private Task<NativeResponse> DispatchToUiThread(NativeRequest request)
+    {
+        var completion = new TaskCompletionSource<NativeResponse>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            ownerWindow.BeginInvoke((Action)(async () =>
+            {
+                try
+                {
+                    completion.SetResult(await HandleRequestOnUiThread(request));
+                }
+                catch (Exception exception)
+                {
+                    completion.SetResult(NativeResponse.Error(
+                        request.RequestId,
+                        "HostError",
+                        exception.Message));
+                }
+            }));
+        }
+        catch (Exception exception)
+        {
+            completion.SetResult(NativeResponse.Error(
+                request.RequestId,
+                "HostError",
+                exception.Message));
+        }
+
+        return completion.Task;
+    }
+
+    private async Task<NativeResponse> HandleRequestOnUiThread(NativeRequest request)
     {
         return request.Action switch
         {
-            "status" => await GetStatusAsync().ConfigureAwait(false),
-            "authenticate" => await AuthenticateAsync(request.Message, args).ConfigureAwait(false),
-            _ => NativeResponse.Error("InvalidRequest", "Unknown native host action."),
+            "status" => NativeResponse.Ready(request.RequestId),
+            "authenticate" => await AuthenticateOnUiThread(request),
+            _ => NativeResponse.Error(request.RequestId, "InvalidRequest", "Unknown native host action."),
         };
     }
 
-    private static async Task<NativeResponse> GetStatusAsync()
+    private async Task<NativeResponse> AuthenticateOnUiThread(NativeRequest request)
     {
-        UserConsentVerifierAvailability availability = await UserConsentVerifier.CheckAvailabilityAsync();
-        return new NativeResponse(
-            Ok: true,
-            Available: availability == UserConsentVerifierAvailability.Available,
-            Verified: false,
-            Availability: availability.ToString(),
-            Result: null,
-            Message: AvailabilityMessage(availability));
-    }
-
-    private static async Task<NativeResponse> AuthenticateAsync(string? requestedMessage, string[] args)
-    {
-        UserConsentVerifierAvailability availability = await UserConsentVerifier.CheckAvailabilityAsync();
-        if (availability != UserConsentVerifierAvailability.Available)
-        {
-            return new NativeResponse(
-                Ok: false,
-                Available: false,
-                Verified: false,
-                Availability: availability.ToString(),
-                Result: "Unavailable",
-                Message: AvailabilityMessage(availability));
-        }
-
-        string message = string.IsNullOrWhiteSpace(requestedMessage) ? DefaultPrompt : requestedMessage.Trim();
+        string message = string.IsNullOrWhiteSpace(request.Message) ? DefaultPrompt : request.Message.Trim();
         if (message.Length > 160) message = message[..160];
 
-        IntPtr chromeWindow = ParseParentWindow(args);
-        using var fallbackOwner = chromeWindow == IntPtr.Zero ? new HiddenOwnerWindow() : null;
-        IntPtr ownerWindow = chromeWindow != IntPtr.Zero ? chromeWindow : fallbackOwner!.Handle;
-
+        // Deliberately do not call CheckAvailabilityAsync first. Some WBF
+        // drivers mishandle two back-to-back biometric sessions. The request
+        // itself reports unavailable, unconfigured, and busy states.
         UserConsentVerificationResult result = await UserConsentVerifierInterop
-            .RequestVerificationForWindowAsync(ownerWindow, message);
+            .RequestVerificationForWindowAsync(ownerWindow.Handle, message);
 
         bool verified = result == UserConsentVerificationResult.Verified;
         return new NativeResponse(
+            RequestId: request.RequestId,
             Ok: verified,
-            Available: true,
+            Available: result is not UserConsentVerificationResult.DeviceNotPresent
+                and not UserConsentVerificationResult.NotConfiguredForUser
+                and not UserConsentVerificationResult.DisabledByPolicy,
             Verified: verified,
-            Availability: availability.ToString(),
+            Availability: "HostReady",
             Result: result.ToString(),
             Message: VerificationMessage(result));
     }
-
-    private static IntPtr ParseParentWindow(IEnumerable<string> args)
-    {
-        const string prefix = "--parent-window=";
-        string? value = args.FirstOrDefault(argument => argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-        if (value is null) return IntPtr.Zero;
-
-        return long.TryParse(value[prefix.Length..], out long handle) && handle > 0
-            ? new IntPtr(handle)
-            : IntPtr.Zero;
-    }
-
-    private static string AvailabilityMessage(UserConsentVerifierAvailability availability) => availability switch
-    {
-        UserConsentVerifierAvailability.Available => "Windows Hello is available.",
-        UserConsentVerifierAvailability.DeviceBusy => "The Windows Hello device is busy.",
-        UserConsentVerifierAvailability.DeviceNotPresent => "No Windows Hello authentication device was found.",
-        UserConsentVerifierAvailability.DisabledByPolicy => "Windows Hello verification is disabled by policy.",
-        UserConsentVerifierAvailability.NotConfiguredForUser => "Set up Windows Hello for this Windows account first.",
-        _ => "Windows Hello is currently unavailable.",
-    };
 
     private static string VerificationMessage(UserConsentVerificationResult result) => result switch
     {
@@ -125,31 +163,36 @@ internal static class Program
         UserConsentVerificationResult.Canceled => "Windows Hello was canceled.",
         _ => "Windows Hello could not verify the current user.",
     };
-}
 
-internal sealed class HiddenOwnerWindow : NativeWindow, IDisposable
-{
-    public HiddenOwnerWindow()
+    private void RequestExit()
     {
-        CreateHandle(new CreateParams
+        if (ownerWindow.IsDisposed) return;
+
+        try
         {
-            Caption = "Chrome Hello Lock",
-            X = -32_000,
-            Y = -32_000,
-            Width = 1,
-            Height = 1,
-        });
+            ownerWindow.BeginInvoke((Action)ExitThread);
+        }
+        catch
+        {
+            // The UI thread is already shutting down.
+        }
     }
 
-    public void Dispose()
+    protected override void ExitThreadCore()
     {
-        DestroyHandle();
+        shutdown.Cancel();
+        input.Dispose();
+        output.Dispose();
+        ownerWindow.Dispose();
+        shutdown.Dispose();
+        base.ExitThreadCore();
     }
 }
 
-internal sealed record NativeRequest(string Action, string? Message);
+internal sealed record NativeRequest(string? RequestId, string Action, string? Message);
 
 internal sealed record NativeResponse(
+    string? RequestId,
     bool Ok,
     bool Available,
     bool Verified,
@@ -157,8 +200,11 @@ internal sealed record NativeResponse(
     string? Result,
     string Message)
 {
-    public static NativeResponse Error(string result, string message) =>
-        new(false, false, false, "Unknown", result, message);
+    public static NativeResponse Ready(string? requestId) =>
+        new(requestId, true, true, false, "HostReady", null, "Windows Hello companion is ready.");
+
+    public static NativeResponse Error(string? requestId, string result, string message) =>
+        new(requestId, false, false, false, "Unknown", result, message);
 }
 
 internal static class NativeMessageProtocol
@@ -166,10 +212,15 @@ internal static class NativeMessageProtocol
     private const int MaximumMessageBytes = 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static NativeRequest Read(Stream input)
+    public static NativeRequest? Read(Stream input)
     {
         Span<byte> lengthBytes = stackalloc byte[sizeof(int)];
-        ReadExactly(input, lengthBytes);
+        int firstByte = input.ReadByte();
+        if (firstByte == -1) return null;
+
+        lengthBytes[0] = (byte)firstByte;
+        ReadExactly(input, lengthBytes[1..]);
+
         int length = BitConverter.ToInt32(lengthBytes);
         if (length <= 0 || length > MaximumMessageBytes)
         {

@@ -55,6 +55,12 @@ Validate the extension JavaScript and manifest:
 .\scripts\validate.ps1
 ```
 
+Test that the companion handles multiple messages over one connection:
+
+```powershell
+.\scripts\test-native-host.ps1 -ExecutablePath .\native-host\bin\Release\net10.0-windows10.0.22621.0\win-x64\ChromeHelloLock.NativeHost.exe
+```
+
 Reinstall after native companion changes:
 
 ```powershell
@@ -77,7 +83,7 @@ Chrome extension service worker
 Windows Hello → verified / not verified
 ```
 
-Chrome and the native companion exchange one length-prefixed JSON message per authentication attempt. The extension only receives the result.
+Chrome keeps one native-messaging connection open for the browser session. The companion processes length-prefixed JSON messages sequentially on a dedicated STA UI thread and keeps a valid owner window and message loop alive. The extension only receives the verification result.
 
 ## Uninstall the companion
 

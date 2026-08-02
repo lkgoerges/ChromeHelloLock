@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS = Object.freeze({
 });
 
 let enforcementQueue = Promise.resolve();
+let nativePort = null;
+const nativeRequests = new Map();
 
 function enqueue(task) {
   enforcementQueue = enforcementQueue.then(task, task);
@@ -129,11 +131,70 @@ async function unlockProfile() {
   await scheduleAutoLock();
 }
 
-async function authenticateWithWindowsHello() {
-  const response = await chrome.runtime.sendNativeMessage(HOST_NAME, {
-    action: "authenticate",
-    message: "Unlock your Chrome work profile",
+function disconnectNativePort(port, reason) {
+  if (nativePort === port) nativePort = null;
+
+  for (const [requestId, pending] of nativeRequests) {
+    clearTimeout(pending.timeout);
+    pending.reject(new Error(reason));
+    nativeRequests.delete(requestId);
+  }
+}
+
+function connectNativeHost() {
+  if (nativePort) return nativePort;
+
+  const port = chrome.runtime.connectNative(HOST_NAME);
+  nativePort = port;
+
+  port.onMessage.addListener((message) => {
+    const requestId = message?.requestId;
+    const pending = requestId ? nativeRequests.get(requestId) : null;
+    if (!pending) return;
+
+    clearTimeout(pending.timeout);
+    nativeRequests.delete(requestId);
+    pending.resolve(message);
   });
+
+  port.onDisconnect.addListener(() => {
+    const reason = chrome.runtime.lastError?.message || "The Windows Hello companion disconnected.";
+    disconnectNativePort(port, reason);
+  });
+
+  return port;
+}
+
+function sendNativeRequest(action, payload = {}, timeoutMs = 15_000) {
+  const requestId = crypto.randomUUID();
+  const port = connectNativeHost();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      nativeRequests.delete(requestId);
+      reject(new Error("The Windows Hello companion did not respond in time."));
+    }, timeoutMs);
+
+    nativeRequests.set(requestId, { resolve, reject, timeout });
+
+    try {
+      port.postMessage({ requestId, action, ...payload });
+    } catch (error) {
+      clearTimeout(timeout);
+      nativeRequests.delete(requestId);
+      reject(error);
+    }
+  });
+}
+
+async function authenticateWithWindowsHello() {
+  const response = await sendNativeRequest(
+    "authenticate",
+    {
+      message: "Unlock your Chrome work profile",
+    },
+    120_000,
+  );
 
   if (!response?.verified) {
     return {
@@ -150,7 +211,7 @@ async function authenticateWithWindowsHello() {
 
 async function nativeStatus() {
   try {
-    return await chrome.runtime.sendNativeMessage(HOST_NAME, { action: "status" });
+    return await sendNativeRequest("status");
   } catch (error) {
     return {
       ok: false,

@@ -45,6 +45,15 @@ function Find-DotnetSdk {
 if (-not $SkipBuild) {
     $dotnet = Find-DotnetSdk
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+
+    Get-CimInstance Win32_Process -Filter "Name = 'ChromeHelloLock.NativeHost.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ExecutablePath -and [System.IO.Path]::GetFullPath($_.ExecutablePath) -eq [System.IO.Path]::GetFullPath($hostExecutable) } |
+        ForEach-Object {
+            Write-Host 'Stopping the previous companion process…'
+            Stop-Process -Id $_.ProcessId -Force
+            Wait-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+        }
+
     Write-Host 'Publishing the Windows Hello companion…'
     & $dotnet publish $projectPath --configuration Release --runtime win-x64 --self-contained true --output $installDir
     if ($LASTEXITCODE -ne 0) {
