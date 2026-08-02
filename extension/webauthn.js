@@ -69,7 +69,6 @@ async function createCredential() {
   await chrome.storage.local.set({
     [CREDENTIAL_KEY]: {
       id: encodeBase64Url(new Uint8Array(credential.rawId)),
-      userId: encodeBase64Url(userId),
     },
   });
 

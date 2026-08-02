@@ -56,15 +56,7 @@ Visible Chrome extension page
 Chrome WebAuthn → Windows Hello → verified / not verified
 ```
 
-The private credential stays inside Windows Hello. The extension stores only its public identifier in `chrome.storage.local`; no server or companion process participates in authentication.
-
-## Remove an older companion installation
-
-Versions before 0.3.0 used a native companion. It is no longer called by the extension and can be removed with:
-
-```powershell
-.\scripts\uninstall-host.ps1
-```
+The private credential stays inside Windows Hello. The extension stores only its public identifier in `chrome.storage.local`; no server or external process participates in authentication.
 
 ## License
 

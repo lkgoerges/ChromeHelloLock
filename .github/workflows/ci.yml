@@ -16,16 +16,3 @@ jobs:
       - name: Validate extension
         shell: pwsh
         run: .\scripts\validate.ps1
-
-  build-native-host:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-      - name: Build native host
-        run: dotnet build .\native-host\ChromeHelloLock.NativeHost.csproj --configuration Release
-      - name: Test persistent native protocol
-        shell: pwsh
-        run: .\scripts\test-native-host.ps1 -ExecutablePath .\native-host\bin\Release\net10.0-windows10.0.22621.0\win-x64\ChromeHelloLock.NativeHost.exe

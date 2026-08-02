@@ -5,9 +5,9 @@ import {
   windowsHelloError,
 } from "./webauthn.js";
 
-const nativeDot = document.querySelector("#native-dot");
-const nativeLabel = document.querySelector("#native-label");
-const nativeMessage = document.querySelector("#native-message");
+const helloDot = document.querySelector("#hello-dot");
+const helloLabel = document.querySelector("#hello-label");
+const helloMessage = document.querySelector("#hello-message");
 const testButton = document.querySelector("#test-button");
 const lockOnStartup = document.querySelector("#lock-on-startup");
 const autoLock = document.querySelector("#auto-lock");
@@ -22,17 +22,17 @@ function setMessage(element, message, type = "") {
 async function checkWindowsHello() {
   const available = browserWebAuthnAvailable();
   const enrolled = available && (await hasBrowserCredential());
-  nativeDot.className = `status-dot ${available ? "available" : "error"}`;
-  nativeLabel.textContent = available
+  helloDot.className = `status-dot ${available ? "available" : "error"}`;
+  helloLabel.textContent = available
     ? enrolled
       ? "Ready — Windows Hello credential found"
       : "Ready — Windows Hello setup required"
     : "Unavailable in this Chrome version";
   setMessage(
-    nativeMessage,
+    helloMessage,
     available
       ? enrolled
-        ? "Chrome will request verification directly; no companion is used."
+        ? "Chrome will request verification directly through Windows Hello."
         : "The first test creates a credential owned by this Chrome extension."
       : "Update Chrome to use browser-owned Windows Hello authentication.",
     available ? "" : "error",
@@ -41,7 +41,7 @@ async function checkWindowsHello() {
 
 testButton.addEventListener("click", async () => {
   testButton.disabled = true;
-  setMessage(nativeMessage, "Waiting for Windows Hello…");
+  setMessage(helloMessage, "Waiting for Windows Hello…");
 
   try {
     const verification = await verifyWithWindowsHello();
@@ -50,20 +50,20 @@ testButton.addEventListener("click", async () => {
       setupOnly: true,
     });
     if (!response?.ok) {
-      setMessage(nativeMessage, response?.message || "Verification was not completed.", "error");
+      setMessage(helloMessage, response?.message || "Verification was not completed.", "error");
       return;
     }
-    nativeDot.className = "status-dot available";
-    nativeLabel.textContent = "Ready — Windows Hello credential found";
+    helloDot.className = "status-dot available";
+    helloLabel.textContent = "Ready — Windows Hello credential found";
     setMessage(
-      nativeMessage,
+      helloMessage,
       verification.created
         ? "Chrome created the local Windows Hello credential. Setup is complete."
         : "Windows Hello verification succeeded.",
       "success",
     );
   } catch (error) {
-    setMessage(nativeMessage, windowsHelloError(error), "error");
+    setMessage(helloMessage, windowsHelloError(error), "error");
   } finally {
     testButton.disabled = false;
   }
