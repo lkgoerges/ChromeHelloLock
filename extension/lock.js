@@ -64,7 +64,10 @@ async function initialize() {
       setStatus("No Windows Hello credential is enrolled. Disable the extension to recover this profile, then set it up again while unlocked.", "error");
       unlockButton.disabled = true;
     } else if (credential.migrationRequired) {
-      setStatus("Unlock once with your existing credential, then reconfigure Windows Hello in Settings.");
+      setStatus("Unlock with your existing credential, then reconfigure Windows Hello in Settings.");
+      unlockButton.disabled = false;
+    } else {
+      unlockButton.disabled = false;
     }
   } catch (error) {
     if (isProtocolMismatch(error)) {
@@ -77,6 +80,14 @@ async function initialize() {
 }
 
 unlockButton.addEventListener("click", authenticate);
+document.querySelector("#manage-extension-button").addEventListener("click", async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "open-extension-management" });
+    if (!response?.ok) throw new Error(response?.message || "Recovery page could not be opened.");
+  } catch {
+    setStatus("Type chrome://extensions in the address bar to manage the extension.", "error");
+  }
+});
 reloadButton.addEventListener("click", () => {
   reloadButton.disabled = true;
   setStatus("Reloading Chrome Hello Lock…", "success");

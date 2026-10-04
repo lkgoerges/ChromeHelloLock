@@ -87,3 +87,26 @@ button {
 .hidden {
   display: none !important;
 }
+
+a { color: var(--accent); overflow-wrap: anywhere; }
+
+:is(button, a, summary, select, input):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.toggle input:focus-visible + span {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+@media (forced-colors: active) {
+  .button, .settings-card, .lock-card, .toggle span { border: 1px solid ButtonText; }
+  .toggle input:checked + span { background: Highlight; }
+  .toggle span::after { background: ButtonText; }
+  .toggle input:checked + span::after { background: HighlightText; }
+}

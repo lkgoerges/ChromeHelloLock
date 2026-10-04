@@ -18,3 +18,5 @@ jobs:
         run: .\scripts\validate.ps1
       - name: Test security-critical code
         run: npm test
+      - name: Build Web Store package
+        run: npm run package

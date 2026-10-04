@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Work profile locked</title>
+    <title>Chrome profile locked</title>
     <link rel="stylesheet" href="ui.css" />
     <link rel="stylesheet" href="lock.css" />
   </head>
@@ -34,11 +34,11 @@
           </svg>
         </div>
 
-        <p class="eyebrow">Work profile</p>
+        <p class="eyebrow">Chrome profile</p>
         <h1 id="lock-title">Locked for now.</h1>
-        <p class="lede">Your tabs are still here. Verify with Windows Hello to return exactly where you left off.</p>
+        <p class="lede">Verify with Windows Hello to restore your interrupted tabs.</p>
 
-        <button id="unlock-button" class="button unlock-button" type="button">
+        <button id="unlock-button" class="button unlock-button" type="button" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 2a7 7 0 0 0-7 7v2m14 0V9a7 7 0 0 0-3.2-5.9M8 22a4 4 0 0 1-4-4v-3m16 0v3a4 4 0 0 1-4 4M9 13v2m6-2v2m-6 3h6" />
           </svg>
@@ -51,6 +51,12 @@
 
         <p id="status" class="status-line" role="status">Fingerprint, face, or Windows PIN</p>
         <p class="recovery-note">Settings stay unavailable while locked so a guest cannot replace your credential.</p>
+        <details class="recovery-help">
+          <summary>Help &amp; recovery</summary>
+          <p>If Windows Hello is unavailable, you can disable Chrome Hello Lock on Chrome’s extensions page. This bypasses the privacy guard; it does not reset Windows Hello. Anyone using this Windows account can do the same.</p>
+          <button id="manage-extension-button" class="button secondary" type="button">Manage extension</button>
+          <p>If this button fails, type <code>chrome://extensions</code> in the address bar. After disabling the extension, use Back or browser history to return to interrupted pages.</p>
+        </details>
       </section>
     </main>
     <script src="lock.js" type="module"></script>

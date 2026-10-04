@@ -202,12 +202,23 @@ select {
 
 .privacy-note {
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
   margin: 22px 4px 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
 }
+
+.notice-list, .shortcut-note {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.notice-list { padding-left: 20px; }
+.notice-list li + li { margin-top: 9px; }
+.acknowledgement { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.6; }
+.acknowledgement input { flex: 0 0 auto; margin-top: 5px; accent-color: var(--accent); }
 
 .privacy-note strong {
   flex: 0 0 auto;

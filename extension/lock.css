@@ -1,7 +1,7 @@
 body {
   min-width: 320px;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .lock-shell {
@@ -11,6 +11,7 @@ body {
   place-items: center;
   padding: 32px;
   isolation: isolate;
+  overflow: clip;
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.045), transparent 42%),
     linear-gradient(145deg, #111216 0%, #17191c 52%, #101114 100%);
@@ -155,10 +156,21 @@ h1 {
 
 .recovery-note {
   margin: 12px auto 0;
-  color: #777873;
+  color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
 }
+
+.recovery-help {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.recovery-help summary { cursor: pointer; }
+.recovery-help code { overflow-wrap: anywhere; }
 
 @media (max-width: 560px) {
   .lock-shell {

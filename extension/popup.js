@@ -23,7 +23,7 @@ async function refresh() {
     : response.credential.migrationRequired
       ? "Windows Hello update required"
       : "Windows Hello ready";
-  primaryButton.textContent = locked ? "Open unlock screen" : "Lock work profile";
+  primaryButton.textContent = locked ? "Open unlock screen" : "Lock Chrome profile";
   primaryButton.disabled = !locked && !response.credential.enrolled;
   settingsButton.disabled = locked;
   settingsButton.title = locked ? "Unlock the profile before opening Settings" : "";

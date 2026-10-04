@@ -15,6 +15,7 @@ const BINDINGS_KEY = "tabTargetBindings";
 const CEREMONY_KEY = "pendingWebAuthnCeremony";
 const CEREMONY_LIFETIME_MS = 70_000;
 const PROTOCOL_VERSION = 2;
+const EXTENSION_MANAGEMENT_URL = "chrome://extensions/";
 
 const DEFAULT_SETTINGS = Object.freeze({
   setupComplete: false,
@@ -97,6 +98,18 @@ function isLockPage(url) {
   return typeof url === "string" && (url === LOCK_URL || url.startsWith(`${LOCK_URL}#`));
 }
 
+// A narrow, intentional recovery exception. Other chrome:// pages stay protected.
+function isRecoveryPage(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "chrome:" && parsed.hostname === "extensions"
+      && !parsed.port && !parsed.username && !parsed.password
+      && ["", "/", "/shortcuts"].includes(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function lockToken(url) {
   if (!isLockPage(url)) return null;
   try {
@@ -147,6 +160,7 @@ async function protectTab(tabId, { includeBackground = false } = {}) {
 
   if (!tab.active && !includeBackground) return { protected: false };
   const currentUrl = tab.pendingUrl || tab.url || "chrome://newtab/";
+  if (isRecoveryPage(currentUrl)) return { protected: false, recovery: true };
   if (isLockPage(currentUrl)) {
     const token = lockToken(currentUrl);
     if (token && state.targets[token]) await setBinding(tabId, token);
@@ -284,6 +298,9 @@ async function beginCeremony(kind, sender) {
   const page = requirePage(sender, kind === "registration" ? ["settings"] : ["lock", "settings"]);
   if (kind === "registration" && (await isLocked())) {
     throw new Error("Unlock the profile before changing its Windows Hello credential.");
+  }
+  if (kind === "registration" && !(await chrome.storage.local.get("disclosureAcceptedV1")).disclosureAcceptedV1) {
+    throw new Error("Read and acknowledge the privacy and recovery notice in Settings first.");
   }
 
   const credential = (await chrome.storage.local.get(CREDENTIAL_KEY))[CREDENTIAL_KEY];
@@ -434,6 +451,18 @@ async function handleMessage(message, sender) {
     case "get-settings":
       requirePage(sender, ["settings"]);
       return { ok: true, settings: await getSettings() };
+    case "get-disclosure":
+      requirePage(sender, ["settings"]);
+      return { ok: true, accepted: Boolean((await chrome.storage.local.get("disclosureAcceptedV1")).disclosureAcceptedV1) };
+    case "accept-disclosure":
+      requirePage(sender, ["settings"]);
+      if (await isLocked()) throw new Error("Unlock the profile before changing its settings.");
+      await chrome.storage.local.set({ disclosureAcceptedV1: true });
+      return { ok: true };
+    case "open-extension-management":
+      requirePage(sender, ["lock", "settings", "popup"]);
+      await chrome.tabs.create({ url: EXTENSION_MANAGEMENT_URL });
+      return { ok: true };
     case "save-settings": {
       requirePage(sender, ["settings"]);
       if (await isLocked()) throw new Error("Unlock the profile before changing its settings.");
@@ -477,6 +506,23 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === AUTO_LOCK_ALARM) enqueue(lockProfile);
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "lock-profile") return;
+  enqueue(async () => {
+    if (await isLocked()) return;
+    const settings = await getSettings();
+    if (!settings.setupComplete) {
+      await chrome.runtime.openOptionsPage();
+      return;
+    }
+    await lockProfile();
+  }).catch((error) => {
+    console.warn("Chrome Hello Lock shortcut failed", error);
+    chrome.action.setBadgeText({ text: "!" });
+    chrome.action.setTitle({ title: "Chrome Hello Lock — shortcut failed; check Settings" });
+  });
 });
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {

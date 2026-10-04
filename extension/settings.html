@@ -23,6 +23,18 @@
         </div>
       </header>
 
+      <section class="settings-card" aria-labelledby="notice-title">
+        <h2 id="notice-title">Before you start</h2>
+        <ul class="notice-list">
+          <li>This is a privacy guard for casual sharing, not a security boundary. Anyone using this Windows account can disable or remove the extension. Lock Windows or use a separate Windows account for stronger protection.</li>
+          <li>Locking navigates interrupted tabs away from their pages. Save forms and other unsaved work first. Unlock restores URLs, not unsaved page state.</li>
+          <li>Interrupted URLs, which may include private information, are stored locally in this Chrome profile across restarts until the restoration pass finishes. The extension does not send them to a server.</li>
+          <li>Chrome’s extensions page remains accessible while locked for recovery. Settings and credential replacement remain blocked until you unlock.</li>
+        </ul>
+        <label class="acknowledgement"><input id="disclosure-accepted" type="checkbox" disabled /> <span>I understand the privacy limits, local URL storage, and possible loss of unsaved work.</span></label>
+        <p id="disclosure-message" class="status-line" role="status"></p>
+      </section>
+
       <section class="settings-card hello-card" aria-labelledby="hello-title">
         <div>
           <span class="section-number">01</span>
@@ -34,8 +46,8 @@
           <span id="hello-label">Checking Chrome support…</span>
         </div>
         <div class="button-row">
-          <button id="enroll-button" class="button" type="button">Set up Windows Hello</button>
-          <button id="test-button" class="button secondary" type="button">Test Windows Hello</button>
+          <button id="enroll-button" class="button" type="button" disabled>Set up Windows Hello</button>
+          <button id="test-button" class="button secondary" type="button" disabled>Test Windows Hello</button>
         </div>
         <p id="hello-message" class="status-line" role="status"></p>
       </section>
@@ -44,13 +56,13 @@
         <div>
           <span class="section-number">02</span>
           <h2 id="behavior-title">Lock behavior</h2>
-          <p>Choose when the work profile should return to its locked state.</p>
+          <p>Choose when your Chrome profile should return to its locked state.</p>
         </div>
 
         <label class="setting-row" for="lock-on-startup">
           <span>
             <strong>Lock when Chrome starts</strong>
-            <small>Recommended for a work profile shared on this PC.</small>
+            <small>Recommended when other people use this PC.</small>
           </span>
           <span class="toggle">
             <input id="lock-on-startup" type="checkbox" />
@@ -72,14 +84,26 @@
           </select>
         </label>
 
-        <button id="save-button" class="button secondary" type="button">Save settings</button>
+        <p class="shortcut-note">Lock quickly with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd>. Change the shortcut on <a href="chrome://extensions/shortcuts">Chrome’s shortcuts page</a> if it conflicts with another extension.</p>
+        <button id="save-button" class="button secondary" type="button" disabled>Save settings</button>
         <p id="save-message" class="status-line" role="status"></p>
       </section>
 
       <aside class="privacy-note">
         <strong>Local by design.</strong>
-        <span>Your biometric data and PIN never leave Windows Hello. Settings and temporarily interrupted tab URLs are stored only in this Chrome profile.</span>
+        <span>The extension never receives your biometric data or Windows PIN. Settings and interrupted tab URLs are stored only in this Chrome profile.</span>
       </aside>
+      <section class="settings-card" aria-labelledby="privacy-title">
+        <h2 id="privacy-title">About &amp; privacy</h2>
+        <p>Chrome Hello Lock <span id="extension-version"></span> uses Chrome and Windows Hello directly. No companion installer, extension account, analytics, or remote authentication service is required.</p>
+        <ul class="notice-list">
+          <li>Local data: settings, notice acknowledgement, credential ID and public verification data, verification timestamps, lock state, and interrupted URLs. Pending authentication challenges and tab bindings are stored only for the browser session.</li>
+          <li>Permissions: Tabs redirects and restores pages; Storage remembers settings and interrupted URLs; Alarms runs the optional re-lock timer. The extension does not read page contents.</li>
+          <li>The extension does not receive your fingerprint, face data, Windows PIN, password, or private credential key. Chrome and Windows handle the authentication prompt.</li>
+          <li>Removing the extension removes its Chrome storage. The Windows Hello passkey may remain; manage it separately in Windows Settings.</li>
+        </ul>
+        <p><a href="https://github.com/lkgoerges/ChromeHelloLock/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener noreferrer">Full privacy notice</a> · <a href="https://github.com/lkgoerges/ChromeHelloLock/issues" target="_blank" rel="noopener noreferrer">Help &amp; feedback</a></p>
+      </section>
     </main>
     <script src="settings.js" type="module"></script>
   </body>
