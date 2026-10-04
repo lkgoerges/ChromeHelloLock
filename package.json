@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test",
     "validate": "node scripts/validate-extension.js",
-    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1",
+    "prepare:store-test": "node scripts/prepare-store-copy.js"
   }
 }

@@ -17,6 +17,10 @@ The upload manifest omits `key`: the developer console rejects that field. The s
 
 The current key is only the stable development identity. Do not present the initial package as the final store-identity build.
 
+The verified draft item ID is `jbejgimbnefhlkallnbldiholhojpogi`. Its public key is recorded in `config/webstore-identity.json`. Run `npm run prepare:store-test` to create a separate unpacked test copy under `artifacts/` with that key. The script verifies the ID, validates all resources, refuses to overwrite existing directories, and leaves `extension/manifest.json` unchanged. You may supply a new output directory with `npm run prepare:store-test -- <directory>`.
+
+Create a separate Chrome profile without the development installation or other browser-locking extensions, open `chrome://extensions`, enable Developer mode, and load the generated test folder. Confirm its ID matches the draft ID, acknowledge the notice, and enroll/test a fresh Windows Hello credential. Verify toolbar and shortcut locking, cancellation/retry, multi-window behaviour, a full Chrome restart while locked, and recovery access. Do not submit the draft until these checks pass. The test copy is not an upload package; continue using the keyless `*-webstore.zip` for uploads.
+
 ## Listing draft
 
 **Name:** Chrome Hello Lock
