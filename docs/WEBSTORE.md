@@ -4,14 +4,16 @@ Version 0.5.0 is a draft package, not a published release. No submission or publ
 
 ## Build and verify
 
-Run `npm test`, `npm run validate`, and `npm run package` on Windows with Node.js. Upload `artifacts/chrome-hello-lock-0.5.0.zip`, not the repository or a ZIP containing a top-level extension folder. Packaging checks resource references, exact filename casing, JavaScript syntax, and minimum permissions, then reads back every archived file. Fixed timestamps and ordinal ordering make repeated builds from identical sources reproducible.
+Run `npm test`, `npm run validate`, and `npm run package` on Windows with Node.js. Upload `artifacts/chrome-hello-lock-0.5.0-webstore.zip`, not the repository or a ZIP containing a top-level extension folder. Packaging checks resource references, exact filename casing, JavaScript syntax, and minimum permissions, then reads back every archived file. Fixed timestamps and ordinal ordering make repeated builds from identical sources reproducible.
+
+The upload manifest omits `key`: the developer console rejects that field. The source manifest keeps its development key unchanged. Every other archived file matches its source; the archived manifest matches the generated upload manifest. To validate an extracted upload archive, run `node scripts/validate-extension.js <extracted-directory> --webstore`.
 
 ## Establish the store identity
 
 1. In the developer console, choose **New item** and upload the ZIP as a draft. Do not submit it for review yet.
 2. Open **Package → View public key**. Copy the public key and the draft’s item ID.
-3. Replace the development manifest’s `key` with the store public key, with PEM markers and line breaks removed. Confirm the unpacked extension ID matches the item ID, then rebuild.
-4. Test the exact archive in a separate Chrome profile. Changing the extension ID changes its WebAuthn origin, so enroll a new Windows Hello credential there. Existing development credentials and local restore data do not migrate to a different extension ID. Unlock and restore your current profile before replacing its development key.
+3. Use the store public key as `key` in a separate unpacked test copy, with PEM markers and line breaks removed. Confirm that copy’s extension ID matches the item ID. Never include the key in a store upload: the packaging script strips it automatically.
+4. Test the packaged files under that store identity in a separate Chrome profile. An extracted upload ZIP without a key does not reliably match the store ID when loaded unpacked; add the public key only to the local test copy. Changing the extension ID changes its WebAuthn origin, so enroll a new Windows Hello credential there. Existing development credentials and local restore data do not migrate to a different extension ID. Unlock and restore your current profile before changing its development key.
 
 The current key is only the stable development identity. Do not present the initial package as the final store-identity build.
 

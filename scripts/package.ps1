@@ -7,8 +7,18 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path (Split-Path -Parent $P
 $extensionDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'extension'
 & (Join-Path $PSScriptRoot 'validate.ps1') -ExtensionDir $extensionDir
 $manifest = Get-Content -LiteralPath (Join-Path $extensionDir 'manifest.json') -Raw | ConvertFrom-Json
+# Transform only the upload manifest. Never alter the installed development key.
+$uploadManifestJson = (& node (Join-Path $PSScriptRoot 'store-manifest.js') | Out-String).TrimEnd() + "`n"
+if ($LASTEXITCODE -ne 0) { throw 'Web Store manifest generation failed.' }
+$uploadManifest = $uploadManifestJson | ConvertFrom-Json
+if ($uploadManifest.PSObject.Properties.Name -contains 'key') { throw 'Development key leaked into upload manifest.' }
+$uploadManifestBytes = [Text.Encoding]::UTF8.GetBytes($uploadManifestJson.Replace("`r`n", "`n"))
+function Get-PackageBytes([string]$Name) {
+    if ($Name -ceq 'manifest.json') { return ,$uploadManifestBytes }
+    return ,[IO.File]::ReadAllBytes((Join-Path $extensionDir $Name))
+}
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
-$archivePath = Join-Path $OutputDirectory "chrome-hello-lock-$($manifest.version).zip"
+$archivePath = Join-Path $OutputDirectory "chrome-hello-lock-$($manifest.version)-webstore.zip"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $names = [string[]]@(Get-ChildItem -LiteralPath $extensionDir -Recurse -File | ForEach-Object {
@@ -25,7 +35,7 @@ try {
             $entry.ExternalAttributes = 0
             $entryStream = $entry.Open()
             try {
-                $bytes = [IO.File]::ReadAllBytes((Join-Path $extensionDir $name))
+                $bytes = Get-PackageBytes $name
                 $entryStream.Write($bytes, 0, $bytes.Length)
             } finally { $entryStream.Dispose() }
         }
@@ -44,7 +54,7 @@ try {
         try {
             $entryStream.CopyTo($buffer)
             $actual = [Convert]::ToBase64String($buffer.ToArray())
-            $expected = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $extensionDir $names[$index])))
+            $expected = [Convert]::ToBase64String((Get-PackageBytes $names[$index]))
             if ($actual -cne $expected) { throw "Archive content mismatch: $($entry.FullName)" }
         } finally { $buffer.Dispose(); $entryStream.Dispose() }
     }

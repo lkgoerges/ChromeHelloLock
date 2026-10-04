@@ -2,10 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { validateManifestIdentity } from "./store-manifest.js";
 
 export const extensionDir = fileURLToPath(new URL("../extension/", import.meta.url));
 
-export function validateExtension(root = extensionDir) {
+export function validateExtension(root = extensionDir, { webStore = false } = {}) {
   const files = [];
   function walk(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -21,7 +22,7 @@ export function validateExtension(root = extensionDir) {
   const manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8"));
   if (manifest.manifest_version !== 3) throw new Error("Manifest V3 is required.");
   if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(manifest.version)) throw new Error("Invalid extension version.");
-  if (!manifest.key || manifest.key.length < 100) throw new Error("Stable public key is missing.");
+  validateManifestIdentity(manifest, { webStore });
   if (!manifest.description || manifest.description.length > 132) throw new Error("Description must be 1–132 characters.");
   if (JSON.stringify([...manifest.permissions].sort()) !== JSON.stringify(["alarms", "storage", "tabs"])) throw new Error("Unexpected or missing permissions.");
   for (const name of ["host_permissions", "optional_host_permissions", "optional_permissions", "content_scripts", "externally_connectable", "web_accessible_resources"]) {
@@ -62,6 +63,7 @@ export function validateExtension(root = extensionDir) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { manifest, files } = validateExtension(process.argv[2] ? resolve(process.argv[2]) : extensionDir);
+  const directory = process.argv.slice(2).find(argument => argument !== "--webstore");
+  const { manifest, files } = validateExtension(directory ? resolve(directory) : extensionDir, { webStore: process.argv.includes("--webstore") });
   console.log(`Validated Chrome Hello Lock ${manifest.version}: ${files.length} bundled files.`);
 }

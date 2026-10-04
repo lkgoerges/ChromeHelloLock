@@ -55,7 +55,7 @@ Create a reproducible Web Store ZIP and SHA-256 checksum (Windows with Node.js):
 npm run package
 ```
 
-The package contains only validated bundled extension resources, with `manifest.json` at the ZIP root. Entry order and timestamps are fixed. The build reads the ZIP back and compares every file against the source. See [Web Store preparation](docs/WEBSTORE.md) and the [privacy notice](docs/PRIVACY.md).
+The `*-webstore.zip` package contains only validated bundled extension resources, with `manifest.json` at the ZIP root. The upload manifest omits the development-only `key` without changing the source manifest or your installed extension ID. Entry order and timestamps are fixed. The build reads the ZIP back and compares files against the source and the generated upload manifest. See [Web Store preparation](docs/WEBSTORE.md) and the [privacy notice](docs/PRIVACY.md).
 
 ## Architecture
 
